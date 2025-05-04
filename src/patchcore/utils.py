@@ -130,13 +130,11 @@ def compute_and_store_final_results(
     row_names=None,
     column_names=[
         "Instance AUROC",
+        "Image AP",          # 新增
         "Full Pixel AUROC",
-        "Full PRO",
+        "Full PRO",          # 新增
         "Anomaly Pixel AUROC",
-        "Anomaly PRO",
-        "Image AP",
-        "Pixel AP",
-        "New PRO"
+        "Pixel AP"           # 新增
     ],
 ):
     """Store computed results as CSV file.

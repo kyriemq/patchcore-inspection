@@ -174,33 +174,34 @@ def run(
                 )
 
             LOGGER.info("Computing evaluation metrics.")
-            auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(
-                scores, anomaly_labels
-            )["auroc"]
-
-            # Compute PRO score & PW Auroc for all images
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
-                segmentations, masks_gt
+            # 计算Image-level指标
+            imagewise_metrics = patchcore.metrics.compute_imagewise_retrieval_metrics(scores, anomaly_labels)
+            instance_auroc = imagewise_metrics['auroc']
+            image_ap = imagewise_metrics['image_ap']  # 新增
+            
+            # 计算Pixel-level指标
+            pixelwise_metrics = patchcore.metrics.compute_pixelwise_retrieval_metrics(segmentations, masks_gt)
+            full_pixel_auroc = pixelwise_metrics['auroc']
+            full_pro = pixelwise_metrics['pro_score']  # 新增
+            pixel_ap = pixelwise_metrics['pixel_ap']    # 新增
+            
+            # 仅针对异常图像的Pixel指标
+            sel_idxs = [i for i in range(len(masks_gt)) if np.sum(masks_gt[i]) > 0]
+            anomaly_pixel_metrics = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+                [segmentations[i] for i in sel_idxs], [masks_gt[i] for i in sel_idxs]
             )
-            full_pixel_auroc = pixel_scores["auroc"]
-
-            # Compute PRO score & PW Auroc only images with anomalies
-            sel_idxs = []
-            for i in range(len(masks_gt)):
-                if np.sum(masks_gt[i]) > 0:
-                    sel_idxs.append(i)
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
-                [segmentations[i] for i in sel_idxs],
-                [masks_gt[i] for i in sel_idxs],
-            )
-            anomaly_pixel_auroc = pixel_scores["auroc"]
-
+            anomaly_pixel_auroc = anomaly_pixel_metrics['auroc']
+            
+            # 更新结果收集字典
             result_collect.append(
                 {
                     "dataset_name": dataset_name,
-                    "instance_auroc": auroc,
+                    "instance_auroc": instance_auroc,
+                    "image_ap": image_ap,                   # 新增
                     "full_pixel_auroc": full_pixel_auroc,
+                    "full_pro": full_pro,                   # 新增
                     "anomaly_pixel_auroc": anomaly_pixel_auroc,
+                    "pixel_ap": pixel_ap                    # 新增
                 }
             )
 

@@ -134,6 +134,8 @@ def compute_and_store_final_results(
         "Full PRO",
         "Anomaly Pixel AUROC",
         "Anomaly PRO",
+        "Image AP",
+        "Pixel AP"
     ],
 ):
     """Store computed results as CSV file.
@@ -141,9 +143,9 @@ def compute_and_store_final_results(
     Args:
         results_path: [str] Where to store result csv.
         results: [List[List]] List of lists containing results per dataset,
-                 with results[i][0] == 'dataset_name' and results[i][1:6] =
+                 with results[i][0] == 'dataset_name' and results[i][1:8] =
                  [instance_auroc, full_pixelwisew_auroc, full_pro,
-                 anomaly-only_pw_auroc, anomaly-only_pro]
+                 anomaly-only_pw_auroc, anomaly-only_pro, image_ap, pixel_ap]
     """
     if row_names is not None:
         assert len(row_names) == len(results), "#Rownames != #Result-rows."

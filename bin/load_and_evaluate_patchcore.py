@@ -145,35 +145,51 @@ def run(methods, results_path, gpu, seed, save_segmentation_images):
                 )
 
             LOGGER.info("Computing evaluation metrics.")
-            # Compute Image-level AUROC scores for all images.
-            auroc = patchcore.metrics.compute_imagewise_retrieval_metrics(
+            # Compute Image-level metrics
+            imagewise_metrics = patchcore.metrics.compute_imagewise_retrieval_metrics(
                 scores, anomaly_labels
-            )["auroc"]
+            )
+            instance_auroc = imagewise_metrics['auroc']
+            image_ap = imagewise_metrics['image_ap']
 
-            # Compute PRO score & PW Auroc for all images
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+            # Compute Pixel-level metrics
+            pixelwise_metrics = patchcore.metrics.compute_pixelwise_retrieval_metrics(
                 segmentations, masks_gt
             )
-            full_pixel_auroc = pixel_scores["auroc"]
+            full_pixel_auroc = pixelwise_metrics['auroc']
+            full_pro = pixelwise_metrics['pro_score']
+            pixel_ap = pixelwise_metrics['pixel_ap']
 
             # Compute PRO score & PW Auroc only for images with anomalies
             sel_idxs = []
             for i in range(len(masks_gt)):
                 if np.sum(masks_gt[i]) > 0:
                     sel_idxs.append(i)
-            pixel_scores = patchcore.metrics.compute_pixelwise_retrieval_metrics(
+            pixel_scores_anomaly = patchcore.metrics.compute_pixelwise_retrieval_metrics(
                 [segmentations[i] for i in sel_idxs], [masks_gt[i] for i in sel_idxs]
             )
-            anomaly_pixel_auroc = pixel_scores["auroc"]
+            anomaly_pixel_auroc = pixel_scores_anomaly["auroc"]
 
             result_collect.append(
                 {
                     "dataset_name": dataset_name,
-                    "instance_auroc": auroc,
+                    "instance_auroc": instance_auroc,
                     "full_pixel_auroc": full_pixel_auroc,
+                    "full_pro": full_pro,
                     "anomaly_pixel_auroc": anomaly_pixel_auroc,
+                    "image_ap": image_ap,
+                    "pixel_ap": pixel_ap
                 }
             )
+
+            print("Image-wise Metrics:")
+            print(f"Instance AUROC: {instance_auroc}")
+            print(f"Image AP: {image_ap}")
+
+            print("Pixel-wise Metrics:")
+            print(f"Full Pixel AUROC: {full_pixel_auroc}")
+            print(f"Full PRO: {full_pro}")
+            print(f"Pixel AP: {pixel_ap}")
 
             for key, item in result_collect[-1].items():
                 if key != "dataset_name":

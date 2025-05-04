@@ -9,6 +9,7 @@ import numpy as np
 import scipy.ndimage as ndimage
 import torch
 import torch.nn.functional as F
+from sklearn.metrics import average_precision_score
 
 
 class FaissNN(object):
@@ -391,3 +392,110 @@ class NearestNeighbourScorer(object):
             self.detection_features = self._load(
                 self._detection_file(load_folder, prepend)
             )
+
+
+def compute_pro_score(anomaly_segmentations, ground_truth_masks):
+    """
+    Computes the PRO score for anomaly segmentations and ground truth segmentation masks.
+
+    Args:
+        anomaly_segmentations: [list of np.arrays or np.array] [NxHxW] Contains
+                                generated segmentation masks.
+        ground_truth_masks: [list of np.arrays or np.array] [NxHxW] Contains
+                            predefined ground truth segmentation masks
+    """
+    if isinstance(anomaly_segmentations, list):
+        anomaly_segmentations = np.stack(anomaly_segmentations)
+    if isinstance(ground_truth_masks, list):
+        ground_truth_masks = np.stack(ground_truth_masks)
+
+    num_images = anomaly_segmentations.shape[0]
+    pro_scores = []
+
+    for i in range(num_images):
+        anomaly_mask = anomaly_segmentations[i]
+        gt_mask = ground_truth_masks[i]
+
+        # 找到所有的真实异常区域
+        unique_labels = np.unique(gt_mask)
+        unique_labels = unique_labels[unique_labels > 0]
+
+        region_pro_scores = []
+        for label in unique_labels:
+            region_mask = (gt_mask == label).astype(np.float32)
+            overlap = np.sum(anomaly_mask * region_mask)
+            region_area = np.sum(region_mask)
+            region_pro = overlap / region_area
+            region_pro_scores.append(region_pro)
+
+        if len(region_pro_scores) > 0:
+            pro_scores.append(np.mean(region_pro_scores))
+
+    if len(pro_scores) > 0:
+        return np.mean(pro_scores)
+    else:
+        return 0.0
+
+
+def compute_imagewise_retrieval_metrics(
+    anomaly_prediction_weights, anomaly_ground_truth_labels
+):
+    from sklearn import metrics
+    fpr, tpr, thresholds = metrics.roc_curve(
+        anomaly_ground_truth_labels, anomaly_prediction_weights
+    )
+    auroc = metrics.roc_auc_score(
+        anomaly_ground_truth_labels, anomaly_prediction_weights
+    )
+    image_ap = average_precision_score(anomaly_ground_truth_labels, anomaly_prediction_weights)
+
+    return {"auroc": auroc, "fpr": fpr, "tpr": tpr, "threshold": thresholds, "image_ap": image_ap}
+
+
+def compute_pixelwise_retrieval_metrics(anomaly_segmentations, ground_truth_masks):
+    from sklearn import metrics
+    if isinstance(anomaly_segmentations, list):
+        anomaly_segmentations = np.stack(anomaly_segmentations)
+    if isinstance(ground_truth_masks, list):
+        ground_truth_masks = np.stack(ground_truth_masks)
+
+    flat_anomaly_segmentations = anomaly_segmentations.ravel()
+    flat_ground_truth_masks = ground_truth_masks.ravel()
+
+    fpr, tpr, thresholds = metrics.roc_curve(
+        flat_ground_truth_masks.astype(int), flat_anomaly_segmentations
+    )
+    auroc = metrics.roc_auc_score(
+        flat_ground_truth_masks.astype(int), flat_anomaly_segmentations
+    )
+
+    precision, recall, thresholds = metrics.precision_recall_curve(
+        flat_ground_truth_masks.astype(int), flat_anomaly_segmentations
+    )
+    F1_scores = np.divide(
+        2 * precision * recall,
+        precision + recall,
+        out=np.zeros_like(precision),
+        where=(precision + recall) != 0,
+    )
+
+    optimal_threshold = thresholds[np.argmax(F1_scores)]
+    predictions = (flat_anomaly_segmentations >= optimal_threshold).astype(int)
+    fpr_optim = np.mean(predictions > flat_ground_truth_masks)
+    fnr_optim = np.mean(predictions < flat_ground_truth_masks)
+
+    # 计算PRO指标
+    pro_score = compute_pro_score(anomaly_segmentations, ground_truth_masks)
+    # 计算像素级AP指标
+    pixel_ap = average_precision_score(flat_ground_truth_masks.astype(int), flat_anomaly_segmentations)
+
+    return {
+        "auroc": auroc,
+        "fpr": fpr,
+        "tpr": tpr,
+        "optimal_threshold": optimal_threshold,
+        "optimal_fpr": fpr_optim,
+        "optimal_fnr": fnr_optim,
+        "pro_score": pro_score,
+        "pixel_ap": pixel_ap
+    }

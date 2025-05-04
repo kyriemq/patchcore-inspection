@@ -134,9 +134,9 @@ def compute_and_store_final_results(
         "Full PRO",
         "Anomaly Pixel AUROC",
         "Anomaly PRO",
-        "Image AP",  # 新增指标
-        "Pixel AP",  # 新增指标
-        "New PRO",   # 新增指标
+        "Image AP",
+        "Pixel AP",
+        "New PRO"
     ],
 ):
     """Store computed results as CSV file.
